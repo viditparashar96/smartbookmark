@@ -151,19 +151,6 @@ Switched to the standard **anon key** (JWT format) for `NEXT_PUBLIC_SUPABASE_ANO
 ### The Problem
 With RLS enabled, INSERT events worked via `postgres_changes`, but DELETE events were never received by any tab — including the tab that triggered the delete.
 
-### Root Cause
-When a row is deleted, Supabase Realtime checks the **SELECT policy** against the old row to determine if the subscribing client should receive the event. The flow is:
-
-1. Row is deleted from the database
-2. Realtime server gets the WAL (Write-Ahead Log) event with the old row data
-3. Realtime checks: "Does this user have SELECT access to this (now-deleted) row?"
-4. The RLS check runs `auth.uid() = user_id` against the old row
-
-This check can fail because the row no longer exists in the database. Even with `REPLICA IDENTITY FULL` (which includes old row data in the WAL), the RLS evaluation context for deleted rows is unreliable.
-
-### Why INSERT Works But DELETE Doesn't
-- **INSERT**: The new row exists in the database. RLS can check `auth.uid() = user_id` against a real, existing row. ✅
-- **DELETE**: The row has been removed. RLS tries to check against a ghost row from the WAL. The evaluation context may not properly resolve `auth.uid()` for this check. ❌
 
 ### Solution: Three-Layer Approach
 
